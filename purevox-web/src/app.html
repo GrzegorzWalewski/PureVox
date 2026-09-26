@@ -30,6 +30,9 @@
 <body>
 <div id="app">
 
+    <!-- ── 站内导航：测试 · PureVoxWeb · PureWavWeb ── -->
+    <div id="webnav"><a href="https://a2heng.github.io/mic-test.html">麦克风测试</a><span class="sep">·</span><a href="https://a2heng.github.io/purevox/mic.html">PureVoxWeb</a><span class="sep">·</span><a href="https://a2heng.github.io/purewav/">PureWavWeb</a></div>
+
     <!-- ── 顶栏 ── -->
     <div id="topbar">
         <div id="title-block">
@@ -45,58 +48,59 @@
     <!-- ── 状态行（Lite 同文案口径）── -->
     <div id="status-line"><span id="status-text">{{IDLE_STATUS}}</span></div>
 
-<!--FLAVOR:net-->
-    <!-- ── 角色切换（浏览器不能监听端口，网络输入走 WebRTC；两端同页可测）── -->
-    <div id="tabs">
-        <button id="tab-rx" class="tab active">接收端 · 降噪播放</button>
-        <button id="tab-tx" class="tab">发送端 · 麦克风直传</button>
+<!--FLAVOR:out-->
+    <!-- 输出端：选一张手机能连上的网卡，二维码即输入页地址 -->
+    <div class="step">
+        <div class="step-l">1 · 选局域网 IP（手机扫码用这张网卡）</div>
+        <div class="row" id="lan-row">
+            <span class="row-l">网卡</span>
+            <select id="ip-select"></select>
+        </div>
+        <div class="step-l">不知道选哪个？选名字里带 WLAN 或 Wi-Fi 的那张。
+            选错了手机会打不开，回来换一张再扫就行。</div>
+        <div class="row" id="srv-row">
+            <span class="row-l">服务器</span>
+            <input id="srv-input" type="text" spellcheck="false"
+                   placeholder="一般不用填">
+        </div>
+        <div class="step-l">服务器一般不用填。只有这个页面不是从家里电脑上
+            直接打开的（比如挂在网上的版本），才填家里电脑的地址，
+            格式如 192.168.0.105:59124。</div>
     </div>
+    <div class="step">
+        <div class="step-l">2 · 手机扫码打开输入页</div>
+        <canvas id="qr-canvas"></canvas>
+        <div class="step-l" id="url-text" style="word-break:break-all"></div>
+        <button id="url-copy" class="mini">复制输入页地址</button>
+    </div>
+    <div class="step">
+        <div class="step-l">3 · 两边都点「启动」即连通（降噪只在本页做）</div>
+        <div class="step-l">手机第一次打开会说证书不安全：点「高级」→
+            「继续前往」即可（自己家的证书，不是真的不安全）。
+            两台设备必须连同一个 Wi-Fi。</div>
+    </div>
+<!--/FLAVOR:out-->
+
+<!--FLAVOR:in-->
+    <!-- 输入端：只管采集发送，往指定的中继服务器推流 -->
     <div id="path-note">
-        程序从 <span id="origin-note">本站</span> 加载；<b>音频只在局域网内直传</b>
-        （WebRTC host candidate，不经任何服务器、不出局域网）。两端需同一网段。
+        <span id="server-note">推流目标：与本页同源的服务器</span>
     </div>
-
-    <div id="pane-rx" class="pane">
-        <div class="steps">
-            <div class="step">
-                <div class="step-l">1 · 生成邀请码并发给对方</div>
-                <button id="rx-make" class="mini">生成邀请码</button>
-                <textarea id="rx-invite" readonly spellcheck="false"
-                          placeholder="点击「生成邀请码」后此处出现连接码"></textarea>
-                <button id="rx-copy" class="mini">复制邀请码</button>
-            </div>
-            <div class="step">
-                <div class="step-l">2 · 粘贴对方的应答码</div>
-                <textarea id="rx-answer" spellcheck="false"
-                          placeholder="把对方发回的应答码粘到这里"></textarea>
-                <button id="rx-accept" class="mini">连接</button>
-            </div>
-        </div>
+    <div class="row" id="srv-row">
+        <span class="row-l">服务器</span>
+        <input id="srv-input" type="text" spellcheck="false"
+               placeholder="一般不用填">
     </div>
-
-    <div id="pane-tx" class="pane" style="display:none">
-        <div class="steps">
-            <div class="step">
-                <div class="step-l">1 · 粘贴对方发来的邀请码</div>
-                <textarea id="tx-invite" spellcheck="false"
-                          placeholder="把对方发来的邀请码粘到这里"></textarea>
-                <div class="row" id="in-row">
-                    <span class="row-l">麦克风</span>
-                    <select id="in-select"></select>
-                    <button id="in-unlock" class="mini" style="display:none"
-                            title="授予麦克风权限">授权</button>
-                </div>
-                <button id="tx-make" class="mini">生成应答码并开声</button>
-            </div>
-            <div class="step">
-                <div class="step-l">2 · 复制应答码发回给对方</div>
-                <textarea id="tx-answer" readonly spellcheck="false"
-                          placeholder="生成后此处出现应答码"></textarea>
-                <button id="tx-copy" class="mini">复制应答码</button>
-            </div>
-        </div>
+    <div class="step-l">服务器一般不用改（扫码进来就是对的）。如果点了启动
+        连不上，先问发码的人要地址填这里；再检查两台设备是不是同一 Wi-Fi，
+        以及浏览器有没有放行麦克风。</div>
+    <div class="row" id="in-row">
+        <span class="row-l">麦克风</span>
+        <select id="in-select"></select>
+        <button id="in-unlock" class="mini" style="display:none"
+                title="授予麦克风权限">授权</button>
     </div>
-<!--/FLAVOR:net-->
+<!--/FLAVOR:in-->
 
 <!--FLAVOR:mic-->
     <div class="row" id="in-row">
@@ -106,9 +110,7 @@
                 title="授予麦克风权限">授权</button>
     </div>
 <!--/FLAVOR:mic-->
-
-    <!-- 输出与增益：Mic 版常驻；Net 版只在接收端出现（发送端不输出、也不做降噪，
-         前/后增益对它没有意义，露出来只会让人以为该在这端调） -->
+    <!-- 输出与增益：Mic 版与输出页常驻；输入页只采集发送，整组隐藏 -->
     <div id="rx-controls" class="ctrl-group">
         <div class="row" id="out-row">
             <span class="row-l">输出</span>
@@ -168,13 +170,14 @@
 <!--FLAVOR:mic-->
             <span class="dg-item"><span class="dg-l">设备 SR</span> <span class="dg-r" id="dbg-dev">--</span></span>
 <!--/FLAVOR:mic-->
-<!--FLAVOR:net-->
-            <span class="dg-item dg-rx"><span class="dg-l">RTT</span> <span class="dg-r" id="dbg-rtt">--</span></span>
-            <span class="dg-item dg-rx"><span class="dg-l">丢包/抖动</span> <span class="dg-r" id="dbg-loss">--</span></span>
-            <span class="dg-item dg-tx" style="display:none"><span class="dg-l">连接</span> <span class="dg-r" id="dbg-signaling">--</span></span>
-            <span class="dg-item dg-tx" style="display:none"><span class="dg-l">已发送</span> <span class="dg-r" id="dbg-sent">--</span></span>
-            <span class="dg-item dg-tx" style="display:none"><span class="dg-l">麦克风</span> <span class="dg-r" id="dbg-mic">--</span></span>
-<!--/FLAVOR:net-->
+<!--FLAVOR:out-->
+            <span class="dg-item"><span class="dg-l">订阅</span> <span class="dg-r" id="dbg-ws">--</span></span>
+            <span class="dg-item"><span class="dg-l">已收</span> <span class="dg-r" id="dbg-rx">--</span></span>
+<!--/FLAVOR:out-->
+<!--FLAVOR:in-->
+            <span class="dg-item"><span class="dg-l">推送</span> <span class="dg-r" id="dbg-ws">--</span></span>
+            <span class="dg-item"><span class="dg-l">已发</span> <span class="dg-r" id="dbg-sent">--</span></span>
+<!--/FLAVOR:in-->
         </div>
     </div>
 
@@ -183,6 +186,37 @@
         <div id="log-title">▾ 日志</div>
         <div id="log-content"></div>
     </div>
+
+    <!-- ── 站点页脚（三页共用）── -->
+    <div id="site-footer">
+        <a href="https://github.com/a2heng/PureVox"
+                target="_blank" rel="noopener">开源代码</a><span class="sep">·</span><a href="https://pan.quark.cn/s/7026b7f32826?pwd=mifn"
+                target="_blank" rel="noopener">网盘下载</a><span class="note">（提取码：mifn）</span>
+    </div>
+
+<!--FLAVOR:mic-->
+    <!-- ── 教程（仅 Mic 页）：视频 + 虚拟声卡文字说明 + 作者主页 ── -->
+    <div class="step">
+        <div class="step-l">视频教程</div>
+        <div class="step-l"><a href="https://www.bilibili.com/video/BV1Sfax66EK4"
+                target="_blank" rel="noopener">在 B 站看使用教程 ↗</a></div>
+    </div>
+    <div class="step">
+        <div class="step-l">把降噪后的声音送进会议 / 直播</div>
+        <div class="step-l">浏览器只能把声音播到扬声器。想让会议、直播软件
+            直接用降噪后的声音，加一条免费虚拟声卡中转：</div>
+        <div class="step-l">1 · 下载安装 VB-CABLE（免费）：
+            <a href="https://vb-audio.com/Cable/" target="_blank"
+               rel="noopener">vb-audio.com/Cable/ ↗</a></div>
+        <div class="step-l">2 · 本页输出选 CABLE Input，
+            会议软件里麦克风选 CABLE Output</div>
+        <div class="step-l">3 · 不会装？看视频：
+            <a href="https://www.bilibili.com/video/BV1i2bazGEKe"
+               target="_blank" rel="noopener">VB 安装教程 ↗</a></div>
+    </div>
+    <div class="step-l" style="text-align:center">作者主页：
+        <a href="https://a2heng.github.io/">a2heng.github.io</a></div>
+<!--/FLAVOR:mic-->
 
 </div>
 

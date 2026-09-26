@@ -181,6 +181,36 @@
             this._watchResume();
         }
 
+        // 远端启动（输出页用）：没有 MediaStream，WS 到的 Int16 帧经
+        // pushRemoteHop 直接入队，其余链路（推理→播放环）与本地完全相同。
+        async startRemote(opts) {
+            opts = opts || {};
+            this._running = true;
+            this.stream = null;
+            this.srcNode = null;
+            this._preGain = PV.util.dbToLinear(opts.preGainDb || 0);
+            this._postDb = opts.postGainDb || 0;
+
+            await this._ensureContext();
+            this.playNode.port.postMessage({ type: 'gain', db: this._postDb });
+            this.playNode.port.postMessage({ type: 'flush' });
+            PV.ort.flush();
+            if (this.ctx.state === 'suspended') await this.resume();
+            this._watchResume();
+        }
+
+        // 远端 hop 入队（Int16 → F32，10ms 网格对齐）：
+        // 不是整 hop 的尾巴直接丢弃，不做补齐——网格错位比丢一跳更坏。
+        pushRemoteHop(i16) {
+            if (!this._running) return;
+            const n = i16.length - (i16.length % HOP);
+            for (let off = 0; off < n; off += HOP) {
+                const hop = new Float32Array(HOP);
+                for (let i = 0; i < HOP; i++) hop[i] = i16[off + i] / 32768;
+                this._onCapture({ type: 'hop', data: hop.buffer });
+            }
+        }
+
         // 交互 / 可见性兜底：自动播放策略下第一次点页面就会放行音频
         _watchResume() {
             if (this._resumeHooked || !this.ctx) return;

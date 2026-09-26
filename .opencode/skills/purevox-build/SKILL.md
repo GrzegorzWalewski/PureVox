@@ -69,27 +69,40 @@ python purevox-web/build/build_web.py --list-models
 python purevox-web/serve.py --open               # 本地 HTTPS 伺服（默认 59124）
 ```
 
-- 产物 `purevox-web/dist/`：`index.html`、`mic.html`（= lite_mic）、`net.html`
-  （= lite_net）、`assets/ort/*`（ONNX Runtime Web 运行时）、`assets/models/*.onnx`
-  （降噪模型）、`build.json`（清单：版本/字节数/sha256）。第三方运行时另存
-  `purevox-web/vendor/`（按 `purevox-web/build/ort.lock.json` 下载并校验 sha512）。
-  **产物与 vendor 都不入版本库**（见 .gitignore），入库的只有 `src/` `workers/`
-  `build/` `serve.py`。
-- **瘦身口径**：页面本体只含应用代码（mic 76KB / net 88KB）；ORT 运行时与模型
-  按 URL 加载，**两个页面共用同一份**（谁先加载谁填缓存）。URL 稳定、不带版本
+- 产物 `purevox-web/dist/`：`index.html`、`mic.html`（= lite_mic 物理设备）、
+  `out.html`（lite_net 输出端：WS 订阅 + 降噪 + 播放）、`in.html`（lite_net 输入端：
+  麦克风 + WS 推送，不降噪）、`assets/ort/*`（ONNX Runtime Web 运行时）、
+  `assets/models/*.onnx`（降噪模型）、`build.json`（清单：版本/字节数/sha256）。
+  第三方运行时另存 `purevox-web/vendor/`（按 `purevox-web/build/ort.lock.json`
+  下载并校验 sha512）。**产物与 vendor 都不入版本库**（见 .gitignore），
+  入库的只有 `src/` `workers/` `build/` `serve.py`。
+- **瘦身口径**：页面本体只含应用代码（约 95~100KB）；ORT 运行时与模型
+  按 URL 加载，**三个页面共用同一份**（谁先加载谁填缓存）。URL 稳定、不带版本
   查询串——内容指纹在 `build.json` 里而不塞 URL，这样重资源能被浏览器/CDN 长期
   缓存（URL 不变即不失效）。别再把 20MB 级资源 base64 内联：凭空多 33% 体积，
   且每次改页面都要重传。
 - ⚠️ **必须走安全上下文**：浏览器只在安全上下文（HTTPS 或 localhost）里给麦克风
-  权限、才允许 WebRTC，所以 `file://` 双击打不开。用 `serve.py` 起 HTTPS
+  权限，所以 `file://` 双击打不开。用 `serve.py` 起 HTTPS
   （重资源发 `max-age=31536000, immutable`，页面发 `no-cache`），或部署到
   GitHub Pages。证书复用桌面端那份 PureVox Local CA（`~/.purevox/ca/`），
   全产品只需信任一次；首次访问在证书警告里点「继续前往」。
-- Net 版网络输入走 **WebRTC**（浏览器不能监听端口）：收发两端在同一页面切换，
-  手工交换连接码（deflate+base64），无 STUN/TURN、无服务端，只走 host candidate。
-  **两条路径分清**：程序资源（页面/ORT/模型）从 Pages 或 CDN 加载（可走外网），
-  音频只在局域网内直传、不出局域网。发送端只有麦克风输入（不输出不降噪），
-  接收端才是扬声器输出 + 前后增益。
+- Net 版网络链路 = **`serve.py` 当纯服务器 + 两个独立页面**（浏览器不能监听端口，
+  跨设备必须有个进程 listen）：`GET /api/lan` 报网卡列表（浏览器无 API 可枚举
+  本机局域网 IP，只能服务端给），`WS /ws/up` 收输入端推上来的 Int16 帧，
+  `WS /ws/down` 原样转给输出端。**服务端不解码、不降噪、不碰音频**，
+  只倒字节；降噪只在输出页做（与 Mic 页同一条 Pipeline + 同一个模型）。
+  音频格式 Int16 / 单声道 / 48kHz / 每帧 480 样本（10ms）。
+  输出页选局域网 IP → 页内二维码即输入页地址（`15-qr.js` 自带编码器，
+  无第三方依赖），手机扫码后两边各点一次启动即连通，零手工交换。
+- 跨站部署（github.io）：页面与中继不同源时用 `?srv=host:port` 指定中继
+  （进页面即记住，输入框可改；scheme 缺省跟页面走）；跨站时二维码自动出
+  「本站 in.html + `?srv=`」形式。`serve.py` 已带 CORS 与 Private Network
+  Access 预检头；手机真机仍需先信任自签证书且同网段。
+  本地模拟部署后：中继跑 59124，另起一个 `serve.py`（纯当静态）跑 59127，
+  打开 `https://127.0.0.1:59127/out.html?srv=127.0.0.1:59124` 即跨 origin。
+- 部署范围：io 上只实装 Mic 页。Net 版（in/out）最终未上 io——浏览器页面
+  开不了系统级服务端口，纯静态站上服务端—客户端直连做不到；本地 `serve.py`
+  起服务实测可用，代码保留（`serve.py` 的中继 + `40-in/out-app.js`）。
 
 ### Android
 

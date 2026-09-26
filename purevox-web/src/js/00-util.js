@@ -57,7 +57,8 @@
     // 增益区间与 Lite 一致（-20~30 dB）。
     const CFG_STORE = {
         mic: 'purevox_web_mic_cfg',
-        net: 'purevox_web_net_cfg',
+        in: 'purevox_web_in_cfg',
+        out: 'purevox_web_out_cfg',
     };
 
     const CFG_SCHEMA = {
@@ -67,7 +68,10 @@
         input_device_id: { def: '' },   // deviceId（每源加盐，同源内有效）
         output_device: { def: '' },
         output_device_id: { def: '' },
-        role: { def: 'rx' },
+        lan_ip: { def: '' },            // 输出页选中的局域网 IP（二维码按它生成）
+        srv: { def: '' },               // 中继服务器 host:port（跨站部署用，
+                                        // 如 github.io 页连回局域网 serve.py；
+                                        // 为空 = 与本页同源）
     };
 
     function loadCfg(flavor) {
@@ -103,9 +107,43 @@
         }
     }
 
+    // ── 中继服务器地址解析（跨站部署用）──
+    // 页面默认与 serve.py 同源（srv 为空）。部署到 github.io 这类静态站后，
+    // 页面与中继不在同源，必须显式指定：`?srv=192.168.0.105:59124`（进页面即
+    // 记住），或在页面上的服务器输入框里改。scheme 缺省跟页面走（https 页
+    // 默认 wss/https），也可写全 `https://host:port`。
+    function resolveServer(flavor, cfg) {
+        let q = '';
+        try { q = (new URLSearchParams(location.search).get('srv') || '').trim(); }
+        catch (e) { q = ''; }
+        if (q) {
+            cfg.srv = q;
+            saveCfg(flavor, cfg);
+        }
+        const raw = (cfg.srv || '').trim();
+        if (!raw) {
+            const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            return { srv: '', httpBase: '', wsBase: wsProto + '//' + location.host, remote: false };
+        }
+        let scheme = location.protocol === 'https:' ? 'https:' : 'http:';
+        let host = raw;
+        const m = raw.match(/^(https?):\/\/(.+)$/i);
+        if (m) {
+            scheme = m[1].toLowerCase() + ':';
+            host = m[2].replace(/\/+$/, '');
+        }
+        host = host.replace(/\/+$/, '');
+        return {
+            srv: host,
+            httpBase: scheme + '//' + host,
+            wsBase: (scheme === 'https:' ? 'wss:' : 'ws:') + '//' + host,
+            remote: true,
+        };
+    }
+
     PV.util = {
         SAMPLE_RATE, HOP, HOP_MS,
         clamp, b64ToText, dbToLinear, linearToDb,
-        nowStamp, loadCfg, saveCfg,
+        nowStamp, loadCfg, saveCfg, resolveServer,
     };
 })(window.PV = window.PV || {});

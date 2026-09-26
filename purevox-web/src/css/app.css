@@ -116,6 +116,12 @@ body {
     gap: 8px;
 }
 
+/* ── 站内导航（最上面一行）── */
+#webnav { text-align: center; font-size: 0.65rem; color: var(--text-dimmer); padding-bottom: 2px; }
+#webnav a { color: var(--text-dim); text-decoration: none; }
+#webnav a:hover { color: var(--good); }
+#webnav .sep { margin: 0 8px; opacity: 0.6; }
+
 /* ── 顶栏 ── */
 #topbar {
     display: flex;
@@ -192,6 +198,18 @@ body {
     border: 1px solid var(--border);
     border-radius: 3px;
     padding: 4px 0;
+}
+.row input[type=text] {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    border-radius: 4px;
 }
 .unit { font-size: 0.65rem; color: var(--text-dimmer); }
 
@@ -283,6 +301,33 @@ body {
     border-radius: 4px;
     word-break: break-all;
 }
+
+/* ── 教程（Mic 页）：站内链接 ── */
+.step-l a { color: var(--good); }
+
+/* ── 站点页脚（三页共用，一行四段，不过度换行）── */
+#site-footer {
+    text-align: center;
+    font-size: 0.68rem;
+    color: var(--text-dimmer);
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+    line-height: 1.8;
+}
+#site-footer a { color: var(--good); text-decoration: none; }
+#site-footer .sep { margin: 0 8px; opacity: 0.6; }
+#site-footer .note { font-size: 0.62rem; }
+
+/* ── 二维码（输出页：白底保证可扫，深色模式也不反白）── */
+#qr-canvas {
+    align-self: center;
+    background: #fff;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    image-rendering: pixelated;
+}
+#url-text { font-size: 0.62rem; }
 
 /* ── 电平表 ── */
 #vu-meter {

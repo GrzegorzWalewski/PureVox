@@ -22,9 +22,10 @@
 
   dist/index.html               入口（选 flavor）
   dist/mic.html                 lite_mic：麦克风 → 降噪 → 本地输出
-  dist/net.html                 lite_net：网络输入（WebRTC）→ 降噪 → 本地输出
-  dist/assets/ort/*.mjs|*.wasm  ONNX Runtime Web 运行时（重资源，两个页面共用一份）
-  dist/assets/models/*.onnx     降噪模型（重资源，两个页面共用一份）
+  dist/out.html                 lite_net 输出端：WS 订阅 → 降噪 → 本地输出
+  dist/in.html                  lite_net 输入端：麦克风 → WS 推送（不降噪）
+  dist/assets/ort/*.mjs|*.wasm  ONNX Runtime Web 运行时（重资源，三个页面共用一份）
+  dist/assets/models/*.onnx     降噪模型（重资源，输出页与 Mic 页共用一份）
   dist/build.json               产物清单（版本 / 字节数 / sha256）
 
 设计要点：
@@ -38,8 +39,10 @@
   真要换内容就换文件名（模型名自带 ep 编号，天然版本化）或换 --base-url 前缀。
 - 换 CDN：--base-url 指定重资源前缀（需带 CORS 头，jsDelivr/unpkg 自带）。
 
-⚠️ 运行必须走安全上下文（浏览器只在安全上下文里给麦克风权限、才允许
-WebRTC）：用 purevox-web/serve.py 起本地 HTTPS，或部署到 GitHub Pages。
+⚠️ 运行必须走安全上下文（浏览器只在安全上下文里给麦克风权限）：
+用 purevox-web/serve.py 起本地 HTTPS，或部署到 GitHub Pages。
+跨设备（手机 ↔ 电脑）必须用 serve.py（浏览器页面不能监听端口，
+输入端要找个地方推流；同 serve.py 还提供 /api/lan 网卡列表与 WS 中继）。
 
 产物与第三方运行时都不入版本库（见 .gitignore）；入库的只有
 src/ workers/ build/ serve.py。
@@ -77,16 +80,17 @@ DEFAULT_VENDOR = os.path.join(WEB_DIR, "vendor")
 DEFAULT_OUT = os.path.join(WEB_DIR, "dist")
 DEFAULT_BASE_URL = "assets"       # 相对路径；同源部署即 Pages 自己
 
-# 共用 JS 段（拼接顺序即依赖顺序：util → ui → ort → pipeline → session）
+# 共用 JS 段（拼接顺序即依赖顺序：util → ui → qr → ort → pipeline → session）
 COMMON_JS = [
     "js/00-util.js",
     "js/10-ui.js",
+    "js/15-qr.js",
     "js/20-ort.js",
     "js/30-pipeline.js",
     "js/35-session.js",
 ]
 
-# 两个 flavor：模板占位符 + 各自的装配脚本
+# 三个 flavor：模板占位符 + 各自的装配脚本
 FLAVORS = {
     "mic": {
         "app_js": "js/40-mic-app.js",
@@ -96,13 +100,21 @@ FLAVORS = {
         "idle_status": "未启动",
         "run_text": "启动",
     },
-    "net": {
-        "app_js": "js/40-net-app.js",
-        "out": "net.html",
-        "title": "PureVox Web · 网络降噪",
-        "subtitle": "Lite Net · 浏览器版",
-        "idle_status": "未连接",
-        "run_text": "连接",
+    "out": {
+        "app_js": "js/40-out-app.js",
+        "out": "out.html",
+        "title": "PureVox Web · 网络输出端",
+        "subtitle": "Lite Net · 输出（接收 + 降噪 + 播放）",
+        "idle_status": "未启动",
+        "run_text": "启动",
+    },
+    "in": {
+        "app_js": "js/40-in-app.js",
+        "out": "in.html",
+        "title": "PureVox Web · 网络输入端",
+        "subtitle": "Lite Net · 输入（麦克风 + 发送）",
+        "idle_status": "未启动",
+        "run_text": "启动",
     },
 }
 
@@ -276,9 +288,9 @@ def build_one(flavor, template, css, base_url, ort_version,
 
 
 def build_index():
-    """dist/index.html：极简入口页，列出两个 flavor（纯静态，无依赖）。"""
+    """dist/index.html：极简入口页，列出三个 flavor（纯静态，无依赖）。"""
     rows = []
-    for name in ("mic", "net"):
+    for name in ("mic", "out", "in"):
         spec = FLAVORS[name]
         rows.append('    <li><a href="%s">%s</a><span>%s</span></li>'
                     % (spec["out"], spec["title"], spec["subtitle"]))
@@ -297,8 +309,8 @@ def build_index():
         "p{max-width:420px;margin:16px auto;font-size:.72rem;line-height:1.6;opacity:.8}</style>\n"
         "</head><body>\n"
         "  <ul>\n%s\n  </ul>\n"
-        "  <p>降噪模型与 ONNX 运行时按需下载并长期缓存（两个页面共用同一份），\n"
-        "  页面本身不请求任何第三方服务。麦克风与 WebRTC 需要安全上下文。</p>\n"
+        "  <p>降噪模型与 ONNX 运行时按需下载并长期缓存（三个页面共用同一份），\n"
+        "  页面本身不请求任何第三方服务。麦克风需要安全上下文。</p>\n"
         "</body></html>\n" % "\n".join(rows)
     )
 
@@ -369,7 +381,7 @@ def main():
     placed = copy_assets(args.out, vendor_dir, model_path, model_name)
 
     log("")
-    for flavor in ("mic", "net"):
+    for flavor in ("mic", "out", "in"):
         html = build_one(flavor, template, css, base_url, lock["version"],
                          model_key, model_label, model_name)
         dst = os.path.join(args.out, FLAVORS[flavor]["out"])
